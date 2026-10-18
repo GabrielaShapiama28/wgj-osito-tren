@@ -190,12 +190,15 @@ public class GameManager : MonoBehaviour
                 case GameplayEventType.MotherFavor:
                     MotherRelationship = ClampStatus(MotherRelationship + 2);
                     BearEnergy = ClampStatus(BearEnergy - 2);
+                    SelfRelationship = ClampStatus(SelfRelationship - 2);
                     break;
                 case GameplayEventType.NormalBird:
                     BearEnergy = ClampStatus(BearEnergy + 2);
+                    SelfRelationship = ClampStatus(SelfRelationship + 2);
                     break;
                 case GameplayEventType.KingBird:
                     KingBirdPhotographed = true;
+                    SelfRelationship = ClampStatus(SelfRelationship + 2);
                     break;
             }
         }

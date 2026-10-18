@@ -694,8 +694,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: "\u2190   \u2192   Mueve al osito y atrapa las frutas"
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8242e7739877b7f49b7e9aefcc75f850, type: 2}
+  m_sharedMaterial: {fileID: -8194794097214857581, guid: 8242e7739877b7f49b7e9aefcc75f850, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
