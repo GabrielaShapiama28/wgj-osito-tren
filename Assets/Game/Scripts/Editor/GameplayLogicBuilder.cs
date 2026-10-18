@@ -21,7 +21,7 @@ public static class GameplayLogicBuilder
     private static readonly Color Pink = Hex("F5A9C0");
     private static readonly Color Cream = Hex("FFF6DE");
 
-    [InitializeOnLoadMethod]
+    //[InitializeOnLoadMethod]
     private static void QueueAutomaticBuild()
     {
         EditorApplication.playModeStateChanged -= HandlePlayModeStateChanged;

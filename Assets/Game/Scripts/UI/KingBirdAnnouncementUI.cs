@@ -26,7 +26,8 @@ public sealed class KingBirdAnnouncementUI : MonoBehaviour
 
     private void Awake()
     {
-        HideImmediate();
+        if (canvasGroup != null)
+            canvasGroup.alpha = 0f;
     }
 
     public void Show()
