@@ -1,21 +1,44 @@
-using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 
-public class GameplayEventController : MonoBehaviour
+public sealed class GameplayEventController : MonoBehaviour
 {
-    [Header("Eventos de Mamá")]
-    [Tooltip("Horas completas en las que puede aparecer el favor de Mamá.")]
-    [SerializeField] private int[] motherFavorHours = { 9, 12, 15 };
+    [Header("Intervalos de Gameplay activo")]
+    [Min(1f)] [SerializeField] private float motherFavorIntervalSeconds = 60f;
+    [Min(1f)] [SerializeField] private float normalBirdIntervalSeconds = 20f;
+    [Min(0.5f)] [SerializeField] private float birdVisibleSeconds = 5f;
+
+    [Header("Pop-up de Mamá")]
     [SerializeField] private EventPopupUI popup;
+
+    [Header("Pájaros en la ventana")]
+    [SerializeField] private GameObject birdRoot;
+    [SerializeField] private UnityEngine.UI.Image birdImage;
+    [SerializeField] private TMP_Text birdTimeText;
+    [SerializeField] private Sprite[] normalBirdSprites;
+    [SerializeField] private Sprite kingBirdSprite;
+
+    [Header("Final")]
+    [SerializeField] private GameplayFinalUI finalUI;
 
     private GameManager manager;
     private string currentEventId;
     private GameplayEventType currentEventType;
+    private float birdTimeRemaining;
+    private bool birdIsVisible;
+    private bool finalDisplayed;
+
+    public float MotherFavorIntervalSeconds => motherFavorIntervalSeconds;
+    public float NormalBirdIntervalSeconds => normalBirdIntervalSeconds;
+    public float BirdVisibleSeconds => birdVisibleSeconds;
+    public bool HasActiveEvent => (popup != null && popup.IsOpen) || birdIsVisible || finalDisplayed;
 
     private void Start()
     {
         manager = GameManager.Instance;
         popup?.Initialize(this);
+        HideBird();
+        finalUI?.Hide();
 
         if (manager == null)
         {
@@ -31,116 +54,199 @@ public class GameplayEventController : MonoBehaviour
 
     private void Update()
     {
-        if (manager == null || popup == null || popup.IsOpen)
+        if (manager == null || finalDisplayed)
             return;
 
-        TryOpenNextDueEvent();
+        if (popup != null && popup.IsOpen)
+            return;
+
+        bool kingDue = manager.Clock.CurrentHour >= 17
+            && !manager.IsEventResolved("king-bird-17")
+            && !manager.KingBirdPhotographed;
+
+        if (kingDue && (!birdIsVisible || currentEventType != GameplayEventType.KingBird))
+        {
+            if (birdIsVisible)
+                ResolveIgnoredBird();
+            ShowBird(true);
+            return;
+        }
+
+        bool dayEnded = manager.Clock.HasReachedEndTime || manager.Clock.CurrentHour >= 20;
+        bool resolvingKingAtDayEnd = birdIsVisible && currentEventType == GameplayEventType.KingBird;
+        if (dayEnded && !resolvingKingAtDayEnd)
+        {
+            ShowFinal();
+            return;
+        }
+
+        if (!dayEnded)
+            manager.AdvanceGameplayIntervals(Time.unscaledDeltaTime);
+
+        if (birdIsVisible)
+        {
+            birdTimeRemaining = Mathf.Max(0f, birdTimeRemaining - Time.unscaledDeltaTime);
+            RefreshBirdTimer();
+            if (birdTimeRemaining <= 0f)
+                ResolveIgnoredBird();
+            return;
+        }
+
+        if (manager.IsMotherFavorDue(motherFavorIntervalSeconds))
+        {
+            OpenMotherFavor();
+            return;
+        }
+
+        if (manager.IsNormalBirdDue(normalBirdIntervalSeconds))
+            ShowBird(false);
     }
 
     public void AcceptCurrentEvent()
     {
-        if (manager == null || string.IsNullOrEmpty(currentEventId))
+        if (manager == null
+            || string.IsNullOrEmpty(currentEventId)
+            || currentEventType != GameplayEventType.MotherFavor)
             return;
 
-        popup.Hide();
-
-        if (currentEventType == GameplayEventType.EndOfDay)
-        {
-            manager.ResolveEvent(currentEventId, true);
-            manager.CompleteDay();
-            SceneNavigator.Load(SceneNavigator.MainMenu);
-            return;
-        }
-
-        manager.BeginMinigame(currentEventId, currentEventType);
-        SceneNavigator.Load(currentEventType == GameplayEventType.MotherFavor
-            ? SceneNavigator.FruitMinigame
-            : SceneNavigator.BirdPhotoMinigame);
+        popup?.Hide();
+        manager.BeginMinigame(currentEventId, GameplayEventType.MotherFavor);
+        currentEventId = null;
+        SceneNavigator.Load(SceneNavigator.FruitMinigame);
     }
 
     public void RejectCurrentEvent()
     {
-        if (manager == null || string.IsNullOrEmpty(currentEventId))
+        if (manager == null
+            || string.IsNullOrEmpty(currentEventId)
+            || currentEventType != GameplayEventType.MotherFavor)
             return;
 
-        bool isEndOfDay = currentEventType == GameplayEventType.EndOfDay;
-        manager.ResolveEvent(currentEventId, false);
-        popup.Hide();
-
-        if (isEndOfDay)
-            manager.CompleteDay();
-
+        manager.RejectGameplayEvent(currentEventId, currentEventType);
+        popup?.Hide();
         currentEventId = null;
+        manager.ResumeGame();
     }
 
-    private void TryOpenNextDueEvent()
+    public void PhotographVisibleBird()
     {
-        int currentHour = manager.Clock.CurrentHour;
-
-        if (currentHour >= 20 && !manager.IsEventResolved("end-of-day-20"))
-        {
-            OpenEvent(
-                "end-of-day-20",
-                GameplayEventType.EndOfDay,
-                "Fin del viaje",
-                manager.EvaluateEnding() + "\n\nAceptar vuelve al menú. Rechazar cierra este mensaje."
-            );
-            return;
-        }
-
-        if (currentHour >= 17 && !manager.IsEventResolved("king-bird-17"))
-        {
-            OpenEvent(
-                "king-bird-17",
-                GameplayEventType.KingBird,
-                "¡Apareció el Pájaro Rey!",
-                "Es la oportunidad que Osito esperaba. ¿Quieres intentar fotografiarlo?"
-            );
-            return;
-        }
-
-        List<GameplayEventType> candidates = new List<GameplayEventType>();
-        foreach (int hour in motherFavorHours)
-        {
-            string eventId = $"mother-hour-{hour}";
-            if (currentHour >= hour && !manager.IsEventResolved(eventId))
-                candidates.Add(GameplayEventType.MotherFavor);
-        }
-
-        if (candidates.Count == 0)
+        if (manager == null || !birdIsVisible || string.IsNullOrEmpty(currentEventId))
             return;
 
-        // Preparado para añadir más eventos por hora: por ahora la única opción es Mamá.
-        GameplayEventType selected = candidates[Random.Range(0, candidates.Count)];
-        int dueHour = FindFirstPendingMotherHour(currentHour);
-        OpenEvent(
-            $"mother-hour-{dueHour}",
-            selected,
+        Sprite photographedSprite = birdImage != null ? birdImage.sprite : null;
+        string eventId = currentEventId;
+        GameplayEventType eventType = currentEventType;
+        HideBird();
+        manager.BeginBirdMinigame(eventId, eventType, photographedSprite);
+        currentEventId = null;
+        SceneNavigator.Load(SceneNavigator.BirdPhotoMinigame);
+    }
+
+    public void Configure(
+        EventPopupUI configuredPopup,
+        GameObject configuredBirdRoot,
+        UnityEngine.UI.Image configuredBirdImage,
+        TMP_Text configuredBirdTimeText,
+        Sprite[] configuredNormalBirdSprites,
+        Sprite configuredKingBirdSprite,
+        GameplayFinalUI configuredFinalUI)
+    {
+        popup = configuredPopup;
+        birdRoot = configuredBirdRoot;
+        birdImage = configuredBirdImage;
+        birdTimeText = configuredBirdTimeText;
+        normalBirdSprites = configuredNormalBirdSprites;
+        kingBirdSprite = configuredKingBirdSprite;
+        finalUI = configuredFinalUI;
+    }
+
+    public void ConfigureIntervals(
+        float configuredMotherFavorIntervalSeconds,
+        float configuredNormalBirdIntervalSeconds,
+        float configuredBirdVisibleSeconds)
+    {
+        motherFavorIntervalSeconds = Mathf.Max(1f, configuredMotherFavorIntervalSeconds);
+        normalBirdIntervalSeconds = Mathf.Max(1f, configuredNormalBirdIntervalSeconds);
+        birdVisibleSeconds = Mathf.Max(0.5f, configuredBirdVisibleSeconds);
+    }
+
+    private void OpenMotherFavor()
+    {
+        if (manager.MotherRelationship <= 0 || popup == null)
+            return;
+
+        manager.ConsumeMotherFavorInterval(motherFavorIntervalSeconds);
+        currentEventId = manager.CreateMotherEventId();
+        currentEventType = GameplayEventType.MotherFavor;
+        manager.PauseGame();
+        popup.Show(
             "Mamá necesita ayuda",
-            "Mamá le pide a Osito recoger frutas. ¿Quieres aceptar el favor?"
+            "Mamá le pide a Osito recoger diez frutas. ¿Quieres aceptar el favor?"
         );
     }
 
-    private int FindFirstPendingMotherHour(int currentHour)
+    private void ShowBird(bool kingBird)
     {
-        int selectedHour = currentHour;
-        foreach (int hour in motherFavorHours)
-        {
-            if (hour <= currentHour && !manager.IsEventResolved($"mother-hour-{hour}"))
-                selectedHour = Mathf.Min(selectedHour, hour);
-        }
+        if (birdRoot == null || birdImage == null)
+            return;
 
-        return selectedHour;
+        Sprite sprite = kingBird ? kingBirdSprite : PickRandomNormalBird();
+        if (sprite == null)
+            return;
+
+        if (!kingBird)
+            manager.ConsumeNormalBirdInterval(normalBirdIntervalSeconds);
+
+        currentEventType = kingBird ? GameplayEventType.KingBird : GameplayEventType.NormalBird;
+        currentEventId = manager.CreateBirdEventId(kingBird);
+        birdImage.sprite = sprite;
+        birdTimeRemaining = birdVisibleSeconds;
+        birdIsVisible = true;
+        birdRoot.SetActive(true);
+        RefreshBirdTimer();
     }
 
-    private void OpenEvent(
-        string eventId,
-        GameplayEventType eventType,
-        string title,
-        string description)
+    private Sprite PickRandomNormalBird()
     {
-        currentEventId = eventId;
-        currentEventType = eventType;
-        popup.Show(title, description);
+        if (normalBirdSprites == null || normalBirdSprites.Length == 0)
+            return null;
+        return normalBirdSprites[Random.Range(0, normalBirdSprites.Length)];
+    }
+
+    private void ResolveIgnoredBird()
+    {
+        if (manager != null && !string.IsNullOrEmpty(currentEventId))
+            manager.IgnoreBirdEvent(currentEventId, currentEventType);
+
+        HideBird();
+        currentEventId = null;
+    }
+
+    private void HideBird()
+    {
+        birdIsVisible = false;
+        birdTimeRemaining = 0f;
+        if (birdRoot != null)
+            birdRoot.SetActive(false);
+    }
+
+    private void RefreshBirdTimer()
+    {
+        if (birdTimeText != null)
+            birdTimeText.text = $"{Mathf.CeilToInt(birdTimeRemaining)} s";
+    }
+
+    private void ShowFinal()
+    {
+        if (finalDisplayed)
+            return;
+
+        finalDisplayed = true;
+        if (birdIsVisible)
+            ResolveIgnoredBird();
+        popup?.Hide();
+        manager.PauseGame();
+        manager.CompleteDay();
+        finalUI?.Show(manager.DidWin, manager.EvaluateEnding());
     }
 }
