@@ -6,8 +6,20 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/Game/Scenes/MainMenu.unity
+    guid: 6ad49d80f591f29449125a9d6b16074f
+  - enabled: 1
+    path: Assets/Game/Scenes/Intro.unity
+    guid: a4c3fd358eeb02e4dba5846949e7cbb2
+  - enabled: 1
     path: Assets/Game/Scenes/Gameplay.unity
     guid: 8c9cfa26abfee488c85f1582747f6a02
+  - enabled: 1
+    path: Assets/Game/Scenes/FruitMinigame.unity
+    guid: 6399f45bbd7274141b965a1d1cf13017
+  - enabled: 1
+    path: Assets/Game/Scenes/BirdPhotoMinigame.unity
+    guid: 38efc54923d6f9847a4812afd2b7ec8f
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 2bcd2660ca9b64942af0de543d8d7100, type: 3}
   m_UseUCBPForAssetBundles: 0
