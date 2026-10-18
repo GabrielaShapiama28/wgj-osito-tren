@@ -6,8 +6,8 @@ using UnityEngine;
 [RequireComponent(typeof(GameClock))]
 public class GameManager : MonoBehaviour
 {
-    public const int MaximumStatusValue = 15;
-    public const int InitialStatusValue = 10;
+    public const int MaximumStatusValue = 9;
+    public const int InitialStatusValue = 6;
 
     public static GameManager Instance { get; private set; }
 
@@ -36,7 +36,7 @@ public class GameManager : MonoBehaviour
     public float MotherFavorElapsed => motherFavorElapsed;
     public float NormalBirdElapsed => normalBirdElapsed;
     public Sprite ActiveBirdSprite => activeBirdSprite;
-    public bool DidWin => KingBirdPhotographed && BearEnergy > 5 && MotherRelationship >= 5;
+    public bool DidWin => KingBirdPhotographed && BearEnergy > 3 && MotherRelationship > 3;
 
     public event Action<string, GameplayEventType, bool> OnMinigameResultApplied;
     public event Action OnStatusChanged;
@@ -145,7 +145,6 @@ public class GameManager : MonoBehaviour
         if (eventType == GameplayEventType.MotherFavor)
         {
             MotherRelationship = ClampStatus(MotherRelationship - 2);
-            SelfRelationship = ClampStatus(SelfRelationship + 2);
             OnStatusChanged?.Invoke();
         }
     }

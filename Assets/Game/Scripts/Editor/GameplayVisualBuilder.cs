@@ -16,7 +16,7 @@ public static class GameplayVisualBuilder
     private const float ReferenceWidth = 1920f;
     private const float ReferenceHeight = 1080f;
     private const float BackgroundSegmentWidth = 3840f;
-    private const int BackgroundRepeatCount = 3;
+    private const int BackgroundRepeatCount = 15;
     private const string VisualRevisionMarker = "GameplayVisualRevision_3";
 
     private static readonly string[] BackgroundFiles =
@@ -269,7 +269,22 @@ public static class GameplayVisualBuilder
 
         GameClock clock = FindSceneComponent<GameClock>(scene, "GameSystems");
         GameplayBackgroundScroller scroller = root.AddComponent<GameplayBackgroundScroller>();
-        scroller.Configure(track, clock, 0f, ReferenceWidth - track.sizeDelta.x);
+        // Follow the viewport centre across four equal sections (three minutes each).
+        // Extend only the outside edges so the viewport stays covered at 08:00/20:00.
+        AddBackgroundEdgeExtension((RectTransform)track.GetChild(0), -BackgroundSegmentWidth);
+        AddBackgroundEdgeExtension((RectTransform)track.GetChild(segmentCount - 1), BackgroundSegmentWidth);
+        scroller.Configure(track, clock, ReferenceWidth * 0.5f, ReferenceWidth * 0.5f - track.sizeDelta.x);
+    }
+
+    private static void AddBackgroundEdgeExtension(RectTransform segment, float offset)
+    {
+        Image image = CreateImage("EdgeExtension", segment, segment.GetComponent<Image>().sprite);
+        RectTransform rect = image.rectTransform;
+        rect.anchorMin = rect.anchorMax = new Vector2(0f, 0.5f);
+        rect.pivot = new Vector2(0f, 0.5f);
+        rect.anchoredPosition = new Vector2(offset, 0f);
+        rect.sizeDelta = new Vector2(BackgroundSegmentWidth, ReferenceHeight);
+        image.preserveAspect = true;
     }
 
     private static void BuildGameplayForeground(RectTransform canvasRect)

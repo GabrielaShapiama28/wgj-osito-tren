@@ -4,8 +4,8 @@ using UnityEngine;
 public sealed class GameplayEventController : MonoBehaviour
 {
     [Header("Intervalos de Gameplay activo")]
-    [Min(1f)] [SerializeField] private float motherFavorIntervalSeconds = 60f;
-    [Min(1f)] [SerializeField] private float normalBirdIntervalSeconds = 20f;
+    [Min(1f)] [SerializeField] private float motherFavorIntervalSeconds = 30f;
+    [Min(1f)] [SerializeField] private float normalBirdIntervalSeconds = 15f;
     [Min(0.5f)] [SerializeField] private float birdVisibleSeconds = 5f;
 
     [Header("Pop-up de Mamá")]
@@ -64,46 +64,51 @@ public sealed class GameplayEventController : MonoBehaviour
         if (popup != null && popup.IsOpen)
             return;
 
+        bool dayEnded = manager.Clock.HasReachedEndTime || manager.Clock.CurrentHour >= 20;
+        if (!dayEnded && manager.Clock.IsRunning)
+            manager.AdvanceGameplayIntervals(Time.unscaledDeltaTime);
+
+        if (birdIsVisible)
+        {
+            // Complete the current event before considering pending ones.
+            if (manager.Clock.IsRunning || dayEnded)
+                birdTimeRemaining = Mathf.Max(
+                    0f, birdTimeRemaining - Time.unscaledDeltaTime);
+
+            RefreshBirdTimer();
+
+            if (birdTimeRemaining <= 0f)
+                ResolveIgnoredBird();
+
+            return;
+        }
+
         bool kingDue = manager.Clock.CurrentHour >= 17
             && !manager.IsEventResolved("king-bird-17")
             && !manager.KingBirdPhotographed;
-
-        if (kingDue && (!birdIsVisible || currentEventType != GameplayEventType.KingBird))
+        if (kingDue)
         {
-            if (birdIsVisible)
-                ResolveIgnoredBird();
             ShowBird(true);
             return;
         }
 
-        bool dayEnded = manager.Clock.HasReachedEndTime || manager.Clock.CurrentHour >= 20;
-        bool resolvingKingAtDayEnd = birdIsVisible && currentEventType == GameplayEventType.KingBird;
-        if (dayEnded && !resolvingKingAtDayEnd)
+        if (dayEnded)
         {
             ShowFinal();
             return;
         }
 
-        if (!dayEnded)
-            manager.AdvanceGameplayIntervals(Time.unscaledDeltaTime);
+        if (!manager.Clock.IsRunning)
+            return;
 
-        if (birdIsVisible)
+        if (manager.IsNormalBirdDue(normalBirdIntervalSeconds))
         {
-            birdTimeRemaining = Mathf.Max(0f, birdTimeRemaining - Time.unscaledDeltaTime);
-            RefreshBirdTimer();
-            if (birdTimeRemaining <= 0f)
-                ResolveIgnoredBird();
+            ShowBird(false);
             return;
         }
 
         if (manager.IsMotherFavorDue(motherFavorIntervalSeconds))
-        {
             OpenMotherFavor();
-            return;
-        }
-
-        if (manager.IsNormalBirdDue(normalBirdIntervalSeconds))
-            ShowBird(false);
     }
 
     public void AcceptCurrentEvent()
@@ -217,7 +222,7 @@ public sealed class GameplayEventController : MonoBehaviour
         birdRoot.SetActive(true);
         RefreshBirdTimer();
         if (kingBird)
-            kingBirdAnnouncement?.Show();
+            kingBirdAnnouncement?.Show(birdRoot.transform as RectTransform);
     }
 
     private Sprite PickRandomNormalBird()
@@ -238,6 +243,7 @@ public sealed class GameplayEventController : MonoBehaviour
 
     private void HideBird()
     {
+        kingBirdAnnouncement?.HideImmediate();
         birdIsVisible = false;
         birdTimeRemaining = 0f;
         currentBirdSprite = null;
