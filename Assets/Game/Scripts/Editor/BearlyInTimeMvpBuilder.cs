@@ -67,6 +67,16 @@ namespace BearlyInTime.Editor
             BuildAll();
         }
 
+        [MenuItem("Bearly in Time/Rebuild Main Menu")]
+        public static void BuildMainMenuOnly()
+        {
+            Directory.CreateDirectory(SceneFolder);
+            BuildMainMenu();
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            Debug.Log("[Bearly in Time] MainMenu pastel y configuración reconstruidos correctamente.");
+        }
+
         private static void BuildMainMenu()
         {
             Scene scene = CreateEmptyScene("MainMenu", PastelCream);
@@ -110,13 +120,7 @@ namespace BearlyInTime.Editor
                 "Bearly in Time\nMVP de game jam\nHecho con Unity 6",
                 controller.ClosePanels
             );
-            GameObject settings = CreateInfoPanel(
-                canvas.transform,
-                "SettingsPanel",
-                "Configuración",
-                "Panel preparado para opciones de volumen, pantalla y accesibilidad.",
-                controller.ClosePanels
-            );
+            GameObject settings = CreateSettingsPanel(canvas.transform, controller.ClosePanels);
 
             SetObjectReference(controller, "instructionsPanel", instructions);
             SetObjectReference(controller, "creditsPanel", credits);
@@ -310,6 +314,119 @@ namespace BearlyInTime.Editor
             return overlay.gameObject;
         }
 
+        private static GameObject CreateSettingsPanel(
+            Transform parent,
+            UnityEngine.Events.UnityAction closeAction)
+        {
+            UnityEngine.UI.Image overlay = CreateImage("SettingsPanel", parent, new Color(0.15f, 0.25f, 0.35f, 0.72f));
+            SetRect(overlay.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+
+            UnityEngine.UI.Image card = CreateImage("Card", overlay.transform, PastelCream);
+            SetRect(card.rectTransform, new Vector2(0.2f, 0.10f), new Vector2(0.8f, 0.90f), Vector2.zero, Vector2.zero);
+            AddWhiteOutline(card.gameObject, 5f);
+
+            TextMeshProUGUI title = CreateText("Heading", card.transform, "Configuración", 52, DeepBlue, TextAlignmentOptions.Center);
+            SetRect(title.rectTransform, new Vector2(0.08f, 0.82f), new Vector2(0.92f, 0.96f), Vector2.zero, Vector2.zero);
+
+            SettingsPanelController settings = overlay.gameObject.AddComponent<SettingsPanelController>();
+            UnityEngine.UI.Slider master = CreateSettingsSlider(card.transform, "MasterVolumeSlider", "Volumen general", 0.67f, out TMP_Text masterValue);
+            UnityEngine.UI.Slider music = CreateSettingsSlider(card.transform, "MusicVolumeSlider", "Música", 0.51f, out TMP_Text musicValue);
+            UnityEngine.UI.Slider sfx = CreateSettingsSlider(card.transform, "SfxVolumeSlider", "Efectos de sonido", 0.35f, out TMP_Text sfxValue);
+            UnityEngine.UI.Toggle fullscreen = CreateSettingsToggle(card.transform, "FullscreenToggle", "Pantalla completa", 0.20f);
+
+            UnityEventTools.AddPersistentListener(master.onValueChanged, settings.SetMasterVolume);
+            UnityEventTools.AddPersistentListener(music.onValueChanged, settings.SetMusicVolume);
+            UnityEventTools.AddPersistentListener(sfx.onValueChanged, settings.SetSfxVolume);
+            UnityEventTools.AddPersistentListener(fullscreen.onValueChanged, settings.SetFullscreen);
+            settings.Configure(master, music, sfx, fullscreen, masterValue, musicValue, sfxValue);
+
+            UnityEngine.UI.Button close = CreateButton("BackButton", card.transform, "Volver");
+            SetRect(close.GetComponent<RectTransform>(), new Vector2(0.3f, 0.035f), new Vector2(0.7f, 0.15f), Vector2.zero, Vector2.zero);
+            UnityEventTools.AddPersistentListener(close.onClick, closeAction);
+            return overlay.gameObject;
+        }
+
+        private static UnityEngine.UI.Slider CreateSettingsSlider(
+            Transform parent,
+            string name,
+            string label,
+            float centerY,
+            out TMP_Text valueText)
+        {
+            GameObject row = CreateUiObject(name + "Row", parent);
+            SetRect(row.GetComponent<RectTransform>(), new Vector2(0.09f, centerY - 0.06f), new Vector2(0.91f, centerY + 0.06f), Vector2.zero, Vector2.zero);
+
+            TextMeshProUGUI rowLabel = CreateText("Label", row.transform, label, 27f, DeepBlue, TextAlignmentOptions.MidlineLeft);
+            SetRect(rowLabel.rectTransform, new Vector2(0f, 0f), new Vector2(0.34f, 1f), new Vector2(8f, 0f), Vector2.zero);
+
+            GameObject sliderObject = CreateUiObject(name, row.transform);
+            SetRect(sliderObject.GetComponent<RectTransform>(), new Vector2(0.36f, 0.26f), new Vector2(0.81f, 0.74f), Vector2.zero, Vector2.zero);
+            UnityEngine.UI.Slider slider = sliderObject.AddComponent<UnityEngine.UI.Slider>();
+            slider.minValue = 0f;
+            slider.maxValue = 1f;
+            slider.value = 1f;
+
+            UnityEngine.UI.Image background = CreateImage("Background", sliderObject.transform, PastelBlue);
+            SetRect(background.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            UnityEngine.UI.Outline backgroundOutline = background.gameObject.AddComponent<UnityEngine.UI.Outline>();
+            backgroundOutline.effectColor = Color.white;
+            backgroundOutline.effectDistance = new Vector2(2f, -2f);
+
+            GameObject fillArea = CreateUiObject("Fill Area", sliderObject.transform);
+            SetRect(fillArea.GetComponent<RectTransform>(), Vector2.zero, Vector2.one, new Vector2(8f, 6f), new Vector2(-8f, -6f));
+            UnityEngine.UI.Image fill = CreateImage("Fill", fillArea.transform, Pink);
+            SetRect(fill.rectTransform, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+
+            GameObject handleArea = CreateUiObject("Handle Slide Area", sliderObject.transform);
+            SetRect(handleArea.GetComponent<RectTransform>(), Vector2.zero, Vector2.one, new Vector2(10f, 0f), new Vector2(-10f, 0f));
+            UnityEngine.UI.Image handle = CreateImage("Handle", handleArea.transform, DeepBlue);
+            RectTransform handleRect = handle.rectTransform;
+            handleRect.anchorMin = handleRect.anchorMax = new Vector2(0.5f, 0.5f);
+            handleRect.pivot = new Vector2(0.5f, 0.5f);
+            handleRect.sizeDelta = new Vector2(32f, 46f);
+            AddWhiteOutline(handle.gameObject, 2f);
+
+            slider.fillRect = fill.rectTransform;
+            slider.handleRect = handleRect;
+            slider.targetGraphic = handle;
+            slider.direction = UnityEngine.UI.Slider.Direction.LeftToRight;
+
+            valueText = CreateText("Value", row.transform, "100%", 25f, DeepBlue, TextAlignmentOptions.Center);
+            SetRect(valueText.rectTransform, new Vector2(0.83f, 0f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
+            valueText.fontStyle = FontStyles.Bold;
+            return slider;
+        }
+
+        private static UnityEngine.UI.Toggle CreateSettingsToggle(
+            Transform parent,
+            string name,
+            string label,
+            float centerY)
+        {
+            GameObject row = CreateUiObject(name + "Row", parent);
+            SetRect(row.GetComponent<RectTransform>(), new Vector2(0.22f, centerY - 0.055f), new Vector2(0.78f, centerY + 0.055f), Vector2.zero, Vector2.zero);
+
+            TextMeshProUGUI rowLabel = CreateText("Label", row.transform, label, 27f, DeepBlue, TextAlignmentOptions.MidlineLeft);
+            SetRect(rowLabel.rectTransform, new Vector2(0f, 0f), new Vector2(0.72f, 1f), Vector2.zero, Vector2.zero);
+
+            UnityEngine.UI.Image box = CreateImage(name, row.transform, PastelBlue);
+            RectTransform boxRect = box.rectTransform;
+            boxRect.anchorMin = boxRect.anchorMax = new Vector2(0.88f, 0.5f);
+            boxRect.pivot = new Vector2(0.5f, 0.5f);
+            boxRect.anchoredPosition = Vector2.zero;
+            boxRect.sizeDelta = new Vector2(58f, 58f);
+            AddWhiteOutline(box.gameObject, 3f);
+
+            UnityEngine.UI.Image checkmark = CreateImage("Checkmark", box.transform, Pink);
+            SetRect(checkmark.rectTransform, new Vector2(0.18f, 0.18f), new Vector2(0.82f, 0.82f), Vector2.zero, Vector2.zero);
+
+            UnityEngine.UI.Toggle toggle = box.gameObject.AddComponent<UnityEngine.UI.Toggle>();
+            toggle.targetGraphic = box;
+            toggle.graphic = checkmark;
+            toggle.isOn = true;
+            return toggle;
+        }
+
         private static void CreateMenuButton(string name, Transform parent, string label, UnityEngine.Events.UnityAction action)
         {
             UnityEngine.UI.Button button = CreateButton(name, parent, label);
@@ -439,6 +556,11 @@ namespace BearlyInTime.Editor
             RequireNamed("MainMenu", "InstructionsPanel");
             RequireNamed("MainMenu", "CreditsPanel");
             RequireNamed("MainMenu", "SettingsPanel");
+            Require<SettingsPanelController>("MainMenu", "SettingsPanelController");
+            RequireNamed("MainMenu", "MasterVolumeSlider");
+            RequireNamed("MainMenu", "MusicVolumeSlider");
+            RequireNamed("MainMenu", "SfxVolumeSlider");
+            RequireNamed("MainMenu", "FullscreenToggle");
 
             EditorSceneManager.OpenScene(ScenePath("Gameplay"), OpenSceneMode.Single);
             Require<GameClock>("Gameplay", "GameClock");
