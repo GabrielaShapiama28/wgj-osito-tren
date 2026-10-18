@@ -4,9 +4,9 @@ using UnityEngine;
 public sealed class GameplayEventController : MonoBehaviour
 {
     [Header("Intervalos de Gameplay activo")]
-    [Min(1f)] [SerializeField] private float motherFavorIntervalSeconds = 60f;
-    [Min(1f)] [SerializeField] private float normalBirdIntervalSeconds = 20f;
-    [Min(0.5f)] [SerializeField] private float birdVisibleSeconds = 5f;
+    [Min(1f)][SerializeField] private float motherFavorIntervalSeconds = 60f;
+    [Min(1f)][SerializeField] private float normalBirdIntervalSeconds = 20f;
+    [Min(0.5f)][SerializeField] private float birdVisibleSeconds = 5f;
 
     [Header("Pop-up de Mamá")]
     [SerializeField] private EventPopupUI popup;
