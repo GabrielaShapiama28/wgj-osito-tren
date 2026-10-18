@@ -16,6 +16,9 @@ public static class GameplayPlayModeSmokeRunner
     private static int step;
     private static double stepStarted;
     private static float clockAfterNormalPhoto;
+    private static float clockBeforeNormalPhoto;
+    private static float clockBeforeFailedPhoto;
+    private static int batchExitCode;
 
     static GameplayPlayModeSmokeRunner()
     {
@@ -40,6 +43,7 @@ public static class GameplayPlayModeSmokeRunner
 
         File.Delete(RequestPath);
         EditorSceneManager.OpenScene(GameplayPath, OpenSceneMode.Single);
+        batchExitCode = 0;
         step = 0;
         stepStarted = EditorApplication.timeSinceStartup;
         EditorApplication.update -= Tick;
@@ -77,6 +81,7 @@ public static class GameplayPlayModeSmokeRunner
                         GameObject bird = NeedNamed("BirdButton");
                         if (!bird.activeInHierarchy)
                             return;
+                        clockBeforeNormalPhoto = GameManager.Instance.Clock.CurrentTotalMinutes;
                         Need<GameplayEventController>().PhotographVisibleBird();
                         Next();
                     });
@@ -84,9 +89,16 @@ public static class GameplayPlayModeSmokeRunner
                 case 2:
                     InScene("BirdPhotoMinigame", () =>
                     {
-                        BirdPhotoMinigameController photo = Need<BirdPhotoMinigameController>();
-                        photo.TestSuccess();
-                        NeedNamed("PhotoContinueButton").GetComponent<UnityEngine.UI.Button>().onClick.Invoke();
+                        PointerController photo = Need<PointerController>();
+                        UnityEngine.UI.Image bird = NeedNamed("BirdVisual").GetComponent<UnityEngine.UI.Image>();
+                        if (bird.sprite != GameManager.Instance.ActiveBirdSprite)
+                            throw new InvalidOperationException("BirdPhotoMinigame no mostró el pájaro seleccionado.");
+                        if (photo.SelectedBirdSprite != GameManager.Instance.ActiveBirdSprite)
+                            throw new InvalidOperationException("BirdPhotoMinigame no conservó la selección inmutable del pájaro.");
+                        if (NeedNamed("PhotoTimerText").GetComponent<TMPro.TMP_Text>() == null)
+                            throw new InvalidOperationException("Falta el temporizador de fotografía.");
+                        photo.TestFinish(true);
+                        photo.ContinueToGameplay();
                         Next();
                     });
                     break;
@@ -96,6 +108,8 @@ public static class GameplayPlayModeSmokeRunner
                         GameManager manager = Need<GameManager>();
                         if (manager.BearEnergy != 12)
                             throw new InvalidOperationException($"Energía tras foto normal: {manager.BearEnergy}, se esperaba 12.");
+                        if (Mathf.Abs(manager.Clock.CurrentTotalMinutes - (clockBeforeNormalPhoto + 10f)) > 1.5f)
+                            throw new InvalidOperationException("La fotografía normal no consumió exactamente 10 minutos.");
                         clockAfterNormalPhoto = manager.Clock.CurrentTotalMinutes;
                         manager.AdvanceGameplayIntervals(61f);
                         Next();
@@ -170,9 +184,9 @@ public static class GameplayPlayModeSmokeRunner
                 case 9:
                     InScene("BirdPhotoMinigame", () =>
                     {
-                        BirdPhotoMinigameController photo = Need<BirdPhotoMinigameController>();
-                        photo.TestSuccess();
-                        NeedNamed("PhotoContinueButton").GetComponent<UnityEngine.UI.Button>().onClick.Invoke();
+                        PointerController photo = Need<PointerController>();
+                        photo.TestFinish(true);
+                        photo.ContinueToGameplay();
                         Next();
                     });
                     break;
@@ -207,12 +221,46 @@ public static class GameplayPlayModeSmokeRunner
                             || manager.BearEnergy != 10
                             || manager.SelfRelationship != 10)
                             throw new InvalidOperationException("Reiniciar no restauró las barras a 10.");
+                        manager.AdvanceGameplayIntervals(21f);
+                        Next();
+                    });
+                    break;
+                case 13:
+                    InScene("Gameplay", () =>
+                    {
+                        GameObject bird = NeedNamed("BirdButton");
+                        if (!bird.activeInHierarchy)
+                            return;
+                        clockBeforeFailedPhoto = GameManager.Instance.Clock.CurrentTotalMinutes;
+                        Need<GameplayEventController>().PhotographVisibleBird();
+                        Next();
+                    });
+                    break;
+                case 14:
+                    InScene("BirdPhotoMinigame", () =>
+                    {
+                        PointerController photo = Need<PointerController>();
+                        photo.TestFinish(false);
+                        if (!NeedNamed("Lose").activeInHierarchy)
+                            throw new InvalidOperationException("La derrota no mostró el pop-up original Lose.");
+                        photo.ContinueToGameplay();
+                        Next();
+                    });
+                    break;
+                case 15:
+                    InScene("Gameplay", () =>
+                    {
+                        GameManager manager = Need<GameManager>();
+                        if (manager.BearEnergy != 10 || manager.LastMinigameSucceeded)
+                            throw new InvalidOperationException("Una fotografía fallida entregó recompensa.");
+                        if (Mathf.Abs(manager.Clock.CurrentTotalMinutes - (clockBeforeFailedPhoto + 10f)) > 1.5f)
+                            throw new InvalidOperationException("La fotografía fallida no consumió exactamente 10 minutos.");
                         manager.IgnoreBirdEvent("king-bird-17", GameplayEventType.KingBird);
                         manager.Clock.AdvanceTime(20f * 60f - manager.Clock.CurrentTotalMinutes);
                         Next();
                     });
                     break;
-                case 13:
+                case 16:
                     InScene("Gameplay", () =>
                     {
                         GameManager manager = Need<GameManager>();
@@ -230,6 +278,7 @@ public static class GameplayPlayModeSmokeRunner
         }
         catch (Exception exception)
         {
+            batchExitCode = 1;
             Debug.LogError($"[Bearly in Time Smoke Test] FALLÓ: {exception}");
             Stop();
         }
@@ -297,14 +346,28 @@ public static class GameplayPlayModeSmokeRunner
 
     private static void Pass()
     {
-        Debug.Log("[Bearly in Time Smoke Test] SUPERADO: pájaro normal, Mamá, FruitMinigame, Pájaro Rey, barras, tiempo, reinicio y finales de victoria/derrota.");
+        Debug.Log("[Bearly in Time Smoke Test] SUPERADO: QTE de fotografía, pájaro seleccionado, victoria/derrota, 10 minutos, pájaro normal, Mamá, FruitMinigame, Pájaro Rey, barras, tiempo, reinicio y finales.");
         Stop();
     }
 
     private static void Stop()
     {
         EditorApplication.update -= Tick;
+        if (Application.isBatchMode)
+        {
+            EditorApplication.playModeStateChanged -= ExitBatchModeAfterPlay;
+            EditorApplication.playModeStateChanged += ExitBatchModeAfterPlay;
+        }
         EditorApplication.isPlaying = false;
+    }
+
+    private static void ExitBatchModeAfterPlay(PlayModeStateChange state)
+    {
+        if (state != PlayModeStateChange.EnteredEditMode)
+            return;
+
+        EditorApplication.playModeStateChanged -= ExitBatchModeAfterPlay;
+        EditorApplication.Exit(batchExitCode);
     }
 }
 #endif

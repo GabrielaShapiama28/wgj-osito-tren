@@ -15,8 +15,8 @@ public static class GameplayLogicBuilder
     private const string GameplayScenePath = "Assets/Game/Scenes/Gameplay.unity";
     private const string BirdScenePath = "Assets/Game/Scenes/BirdPhotoMinigame.unity";
     private const string AssetRoot = "Assets/Game/Sprites/GameplayLogic";
-    private const string RevisionMarker = "GameplayLogicRevision_2";
-    private const string SessionKey = "BearlyInTime.GameplayLogicBuilt2";
+    private const string RevisionMarker = "GameplayLogicRevision_3";
+    private const string SessionKey = "BearlyInTime.GameplayLogicBuilt3";
     private static readonly Color DeepBlue = Hex("2E6590");
     private static readonly Color Pink = Hex("F5A9C0");
     private static readonly Color Cream = Hex("FFF6DE");
@@ -64,8 +64,6 @@ public static class GameplayLogicBuilder
         try
         {
             BuildGameplayScene();
-            BuildBirdPhotoScene();
-            FruitMinigameBuilder.BuildFruitMinigame();
         }
         finally
         {
@@ -90,14 +88,19 @@ public static class GameplayLogicBuilder
             Require<GameplayStatusUI>(gameplay, errors);
             Require<GameplayFinalUI>(gameplay, errors);
             RequireNamed(gameplay, "BirdButton", errors);
+            RequireNamed(gameplay, "KingBirdAnnouncement", errors);
             RequireNamed(gameplay, "FinalPanel", errors);
             RequireNamed(gameplay, RevisionMarker, errors);
+            if (FindNamed(gameplay, "SelfLabel") != null)
+                errors.Add("Gameplay: todavía existe el texto Relación Yo.");
 
             Scene bird = EditorSceneManager.OpenScene(BirdScenePath, OpenSceneMode.Single);
-            Require<BirdPhotoMinigameController>(bird, errors);
-            RequireNamed(bird, "TestSuccessButton", errors);
-            RequireNamed(bird, "TestFailureButton", errors);
-            RequireNamed(bird, "PhotoContinueButton", errors);
+            Require<PointerController>(bird, errors);
+            Require<WinPopupAnimation>(bird, errors);
+            RequireNamed(bird, "BirdVisual", errors);
+            RequireNamed(bird, "Safe Zone", errors);
+            RequireNamed(bird, "PhotoTimerText", errors);
+            RequireNamed(bird, "BirdPhotoIntegrationRevision_1", errors);
         }
         finally
         {
@@ -121,17 +124,20 @@ public static class GameplayLogicBuilder
             throw new InvalidOperationException("Gameplay necesita Canvas, GameplayEventController y EventPopupUI existentes.");
 
         RemoveNamed(scene, "GameplayBirdLayer");
+        RemoveNamed(scene, "KingBirdAnnouncement");
         RemoveNamed(scene, "GameplayLogicOverlay");
         RemoveNamed(scene, RevisionMarker);
 
         RectTransform canvasRect = (RectTransform)canvas.transform;
         BuildBirdLayer(canvasRect, controller, out GameObject birdRoot, out UnityEngine.UI.Image birdImage, out TMP_Text birdTimer);
+        KingBirdAnnouncementUI kingAnnouncement = BuildKingBirdAnnouncement(canvasRect);
         BuildStatusUI(scene);
         GameplayFinalUI finalUI = BuildFinalOverlay(canvasRect);
 
         Sprite[] normalBirds = LoadNormalBirdSprites();
         Sprite king = LoadSprite($"{AssetRoot}/pajaros/PajaroRey.PNG");
         controller.Configure(popup, birdRoot, birdImage, birdTimer, normalBirds, king, finalUI);
+        controller.ConfigureKingBirdAnnouncement(kingAnnouncement);
         controller.ConfigureIntervals(60f, 20f, 5f);
 
         GameObject marker = new GameObject(RevisionMarker);
@@ -156,10 +162,11 @@ public static class GameplayLogicBuilder
 
         birdRoot = CreateUiObject("BirdButton", layer.transform);
         RectTransform birdRect = birdRoot.GetComponent<RectTransform>();
-        birdRect.anchorMin = birdRect.anchorMax = new Vector2(0.66f, 0.60f);
+        // Parte despejada de la ventana: a la derecha del oso y lejos de la barra lateral.
+        birdRect.anchorMin = birdRect.anchorMax = new Vector2(0.82f, 0.62f);
         birdRect.pivot = new Vector2(0.5f, 0.5f);
         birdRect.anchoredPosition = Vector2.zero;
-        birdRect.sizeDelta = new Vector2(340f, 300f);
+        birdRect.sizeDelta = new Vector2(270f, 235f);
 
         birdImage = birdRoot.AddComponent<UnityEngine.UI.Image>();
         birdImage.preserveAspect = true;
@@ -172,6 +179,42 @@ public static class GameplayLogicBuilder
         SetBottomCenter(birdTimer.rectTransform, new Vector2(0f, -12f), new Vector2(110f, 42f));
         AddOutline(birdTimer.gameObject, DeepBlue, 2f);
         birdRoot.SetActive(false);
+    }
+
+    private static KingBirdAnnouncementUI BuildKingBirdAnnouncement(RectTransform canvas)
+    {
+        GameObject root = CreateUiObject("KingBirdAnnouncement", canvas);
+        RectTransform rootRect = root.GetComponent<RectTransform>();
+        rootRect.anchorMin = rootRect.anchorMax = new Vector2(0.77f, 0.88f);
+        rootRect.pivot = new Vector2(0.5f, 0.5f);
+        rootRect.anchoredPosition = Vector2.zero;
+        rootRect.sizeDelta = new Vector2(610f, 112f);
+
+        CanvasGroup group = root.AddComponent<CanvasGroup>();
+        group.interactable = false;
+        group.blocksRaycasts = false;
+        UnityEngine.UI.Image glow = root.AddComponent<UnityEngine.UI.Image>();
+        glow.color = new Color32(255, 221, 92, 235);
+        glow.raycastTarget = false;
+        UnityEngine.UI.Outline whiteBorder = root.AddComponent<UnityEngine.UI.Outline>();
+        whiteBorder.effectColor = Color.white;
+        whiteBorder.effectDistance = new Vector2(5f, -5f);
+
+        TMP_Text message = CreateText(
+            "KingBirdMessage",
+            root.transform,
+            "¡ES EL PÁJARO REY!",
+            41f,
+            DeepBlue,
+            TextAlignmentOptions.Center);
+        StretchInset(message.rectTransform, 12f);
+        message.fontStyle = FontStyles.Bold;
+        AddOutline(message.gameObject, Color.white, 2f);
+
+        KingBirdAnnouncementUI announcement = root.AddComponent<KingBirdAnnouncementUI>();
+        announcement.Configure(group, rootRect, glow, message);
+        root.SetActive(false);
+        return announcement;
     }
 
     private static void BuildStatusUI(Scene scene)
@@ -199,14 +242,12 @@ public static class GameplayLogicBuilder
         ConfigureFill(selfFill);
         GameObject momLabels = CreateUiObject("StatusLogicLabels", mom.transform);
         Stretch(momLabels.GetComponent<RectTransform>());
-        TMP_Text momValue = CreateValueLabel(momLabels.transform, "MotherValue", new Vector2(82f, -21f));
+        TMP_Text momValue = CreateBarValueLabel(momFill.transform.parent, "MotherValue");
         AddThresholdLabels(momLabels.transform, new Vector2(82f, -61f));
 
         GameObject playerLabels = CreateUiObject("StatusLogicLabels", player.transform);
         Stretch(playerLabels.GetComponent<RectTransform>());
-        TMP_Text selfTitle = CreateText("SelfLabel", playerLabels.transform, "Relación Yo", 21f, DeepBlue, TextAlignmentOptions.Left);
-        SetCentered(selfTitle.rectTransform, new Vector2(35f, 28f), new Vector2(160f, 30f));
-        TMP_Text selfValue = CreateValueLabel(playerLabels.transform, "SelfValue", new Vector2(82f, -2f));
+        TMP_Text selfValue = CreateBarValueLabel(selfFill.transform.parent, "SelfValue");
         AddThresholdLabels(playerLabels.transform, new Vector2(82f, -36f));
 
         GameplayStatusUI status = sidebar.AddComponent<GameplayStatusUI>();
@@ -342,19 +383,35 @@ public static class GameplayLogicBuilder
     {
         GameObject bird = FindNamed(scene, "GameplayBirdLayer");
         GameObject foreground = FindNamed(scene, "GameplayForeground");
+        GameObject kingAnnouncement = FindNamed(scene, "KingBirdAnnouncement");
         GameObject overlay = FindNamed(scene, "GameplayLogicOverlay");
         GameObject popup = FindNamed(scene, "MVPGameplayUI");
         if (bird != null && foreground != null)
-            bird.transform.SetSiblingIndex(foreground.transform.GetSiblingIndex() + 1);
+            bird.transform.SetSiblingIndex(foreground.transform.GetSiblingIndex());
+        if (kingAnnouncement != null && foreground != null)
+            kingAnnouncement.transform.SetSiblingIndex(foreground.transform.GetSiblingIndex() + 1);
         popup?.transform.SetAsLastSibling();
         overlay?.transform.SetAsLastSibling();
     }
 
-    private static TMP_Text CreateValueLabel(Transform parent, string name, Vector2 position)
+    private static TMP_Text CreateBarValueLabel(Transform parent, string name)
     {
-        TMP_Text text = CreateText(name, parent, "10/15", 22f, DeepBlue, TextAlignmentOptions.Center);
-        SetCentered(text.rectTransform, position, new Vector2(86f, 32f));
+        Transform previous = parent.Find(name);
+        if (previous != null)
+            UnityEngine.Object.DestroyImmediate(previous.gameObject);
+
+        TMP_Text text = CreateText(name, parent, "10/15", 21f, DeepBlue, TextAlignmentOptions.Center);
+        text.rectTransform.anchorMin = Vector2.zero;
+        text.rectTransform.anchorMax = Vector2.one;
+        text.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+        text.rectTransform.offsetMin = new Vector2(8f, 4f);
+        text.rectTransform.offsetMax = new Vector2(-8f, -4f);
+        text.enableAutoSizing = true;
+        text.fontSizeMin = 14f;
+        text.fontSizeMax = 21f;
+        text.overflowMode = TextOverflowModes.Ellipsis;
         text.fontStyle = FontStyles.Bold;
+        text.transform.SetAsLastSibling();
         return text;
     }
 

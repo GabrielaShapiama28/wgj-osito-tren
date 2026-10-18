@@ -17,6 +17,7 @@ public sealed class GameplayEventController : MonoBehaviour
     [SerializeField] private TMP_Text birdTimeText;
     [SerializeField] private Sprite[] normalBirdSprites;
     [SerializeField] private Sprite kingBirdSprite;
+    [SerializeField] private KingBirdAnnouncementUI kingBirdAnnouncement;
 
     [Header("Final")]
     [SerializeField] private GameplayFinalUI finalUI;
@@ -27,17 +28,20 @@ public sealed class GameplayEventController : MonoBehaviour
     private float birdTimeRemaining;
     private bool birdIsVisible;
     private bool finalDisplayed;
+    private Sprite currentBirdSprite;
 
     public float MotherFavorIntervalSeconds => motherFavorIntervalSeconds;
     public float NormalBirdIntervalSeconds => normalBirdIntervalSeconds;
     public float BirdVisibleSeconds => birdVisibleSeconds;
     public bool HasActiveEvent => (popup != null && popup.IsOpen) || birdIsVisible || finalDisplayed;
+    public Sprite CurrentBirdSprite => currentBirdSprite;
 
     private void Start()
     {
         manager = GameManager.Instance;
         popup?.Initialize(this);
         HideBird();
+        kingBirdAnnouncement?.HideImmediate();
         finalUI?.Hide();
 
         if (manager == null)
@@ -133,7 +137,9 @@ public sealed class GameplayEventController : MonoBehaviour
         if (manager == null || !birdIsVisible || string.IsNullOrEmpty(currentEventId))
             return;
 
-        Sprite photographedSprite = birdImage != null ? birdImage.sprite : null;
+        Sprite photographedSprite = currentBirdSprite != null
+            ? currentBirdSprite
+            : birdImage != null ? birdImage.sprite : null;
         string eventId = currentEventId;
         GameplayEventType eventType = currentEventType;
         HideBird();
@@ -158,6 +164,11 @@ public sealed class GameplayEventController : MonoBehaviour
         normalBirdSprites = configuredNormalBirdSprites;
         kingBirdSprite = configuredKingBirdSprite;
         finalUI = configuredFinalUI;
+    }
+
+    public void ConfigureKingBirdAnnouncement(KingBirdAnnouncementUI configuredAnnouncement)
+    {
+        kingBirdAnnouncement = configuredAnnouncement;
     }
 
     public void ConfigureIntervals(
@@ -199,11 +210,14 @@ public sealed class GameplayEventController : MonoBehaviour
 
         currentEventType = kingBird ? GameplayEventType.KingBird : GameplayEventType.NormalBird;
         currentEventId = manager.CreateBirdEventId(kingBird);
+        currentBirdSprite = sprite;
         birdImage.sprite = sprite;
         birdTimeRemaining = birdVisibleSeconds;
         birdIsVisible = true;
         birdRoot.SetActive(true);
         RefreshBirdTimer();
+        if (kingBird)
+            kingBirdAnnouncement?.Show();
     }
 
     private Sprite PickRandomNormalBird()
@@ -226,6 +240,7 @@ public sealed class GameplayEventController : MonoBehaviour
     {
         birdIsVisible = false;
         birdTimeRemaining = 0f;
+        currentBirdSprite = null;
         if (birdRoot != null)
             birdRoot.SetActive(false);
     }

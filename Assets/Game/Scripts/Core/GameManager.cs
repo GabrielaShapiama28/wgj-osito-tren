@@ -138,6 +138,9 @@ public class GameManager : MonoBehaviour
 
     public void RejectGameplayEvent(string eventId, GameplayEventType eventType)
     {
+        if (string.IsNullOrWhiteSpace(eventId) || IsEventResolved(eventId))
+            return;
+
         ResolveEvent(eventId, false);
         if (eventType == GameplayEventType.MotherFavor)
         {
@@ -163,8 +166,8 @@ public class GameManager : MonoBehaviour
 
     public void BeginBirdMinigame(string eventId, GameplayEventType eventType, Sprite birdSprite)
     {
-        activeBirdSprite = birdSprite;
         BeginMinigame(eventId, eventType);
+        activeBirdSprite = birdSprite;
     }
 
     public void ApplyMinigameResult(bool succeeded, int hoursToAdvance = 0)
