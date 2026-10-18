@@ -13,7 +13,7 @@ public static class BirdPhotoIntegrationBuilder
     private const string RevisionMarker = "BirdPhotoIntegrationRevision_1";
     private const string SessionKey = "BearlyInTime.BirdPhotoIntegrationBuilt1";
 
-    [InitializeOnLoadMethod]
+    //[InitializeOnLoadMethod]
     private static void QueueAutomaticBuild()
     {
         EditorApplication.delayCall += TryAutomaticBuild;

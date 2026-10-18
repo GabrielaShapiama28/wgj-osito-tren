@@ -27,7 +27,7 @@ public static class GameplayVisualBuilder
         "fondoazul.png"
     };
 
-    [InitializeOnLoadMethod]
+    //[InitializeOnLoadMethod]
     private static void BuildOnceWhenGameplayIsOpen()
     {
         EditorApplication.delayCall += () =>
