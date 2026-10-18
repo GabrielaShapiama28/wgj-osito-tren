@@ -265,14 +265,14 @@ public static class FruitMinigameBuilder
         GameObject basketObject = new GameObject("BasketCatchZone");
         basketObject.transform.SetParent(playerObject.transform, false);
         // La canasta pertenece al mismo root móvil que el oso y descansa sobre su cabeza.
-        basketObject.transform.localPosition = new Vector3(0f, 0.10f, 0f);
+        basketObject.transform.localPosition = new Vector3(0f, -0.15f, 0f);
         basketObject.transform.localScale = Vector3.one * 1.6f;
         basketRenderer = basketObject.AddComponent<SpriteRenderer>();
         basketRenderer.sortingOrder = 11;
 
         GameObject basketTrigger = new GameObject("BasketCollisionTrigger");
         basketTrigger.transform.SetParent(playerObject.transform, false);
-        basketTrigger.transform.localPosition = new Vector3(0f, 2.20f, 0f);
+        basketTrigger.transform.localPosition = new Vector3(0f, 1.7f, 0f);
         BoxCollider2D basketCollider = basketTrigger.AddComponent<BoxCollider2D>();
         basketCollider.isTrigger = true;
         basketCollider.size = new Vector2(1.8f, 0.35f);

@@ -22,7 +22,10 @@ public sealed class GameplayStatusUI : MonoBehaviour
     private void Update()
     {
         if (manager == null)
+        {
             BindManager();
+            Refresh();
+        }
     }
 
     private void OnDisable()
@@ -71,11 +74,13 @@ public sealed class GameplayStatusUI : MonoBehaviour
 
         int mother = manager.MotherRelationship;
         if (motherHappy != null)
-            motherHappy.SetActive(mother >= 10);
+            motherHappy.SetActive(mother >= 7);
+
         if (motherSerious != null)
-            motherSerious.SetActive(mother >= 5 && mother < 10);
+            motherSerious.SetActive(mother >= 4 && mother < 7);
+
         if (motherSad != null)
-            motherSad.SetActive(mother < 5);
+            motherSad.SetActive(mother < 4);
     }
 
     private static void SetBar(UnityEngine.UI.Image fill, TMP_Text label, int value)
@@ -86,14 +91,14 @@ public sealed class GameplayStatusUI : MonoBehaviour
             fill.fillMethod = UnityEngine.UI.Image.FillMethod.Horizontal;
             fill.fillOrigin = 0;
             fill.fillAmount = value / (float)GameManager.MaximumStatusValue;
-            fill.color = value >= 10
+            fill.color = value >= 7
                 ? new Color32(252, 207, 75, 255)
-                : value >= 5
+                : value >= 4
                     ? new Color32(244, 147, 62, 255)
                     : new Color32(220, 76, 86, 255);
         }
 
         if (label != null)
-            label.text = $"{value}/15";
+            label.text = $"{value}/{GameManager.MaximumStatusValue}";
     }
 }

@@ -49,15 +49,19 @@ public sealed class GameplayBackgroundScroller : MonoBehaviour
         RefreshPosition();
     }
 
+
     public void RefreshPosition()
     {
         if (backgroundTrack == null)
             return;
 
+        float progress = NormalizedProgress;
+
         Vector2 position = backgroundTrack.anchoredPosition;
-        position.x = Mathf.Lerp(startX, endX, NormalizedProgress);
+        position.x = Mathf.Lerp(startX, endX, progress);
         backgroundTrack.anchoredPosition = position;
     }
+
 
     private void TryBindClock()
     {

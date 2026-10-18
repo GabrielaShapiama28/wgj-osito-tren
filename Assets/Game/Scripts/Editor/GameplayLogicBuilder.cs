@@ -138,7 +138,7 @@ public static class GameplayLogicBuilder
         Sprite king = LoadSprite($"{AssetRoot}/pajaros/PajaroRey.PNG");
         controller.Configure(popup, birdRoot, birdImage, birdTimer, normalBirds, king, finalUI);
         controller.ConfigureKingBirdAnnouncement(kingAnnouncement);
-        controller.ConfigureIntervals(60f, 20f, 5f);
+        controller.ConfigureIntervals(30f, 15f, 5f);
 
         GameObject marker = new GameObject(RevisionMarker);
         marker.transform.SetParent(canvas.transform, false);
@@ -400,7 +400,7 @@ public static class GameplayLogicBuilder
         if (previous != null)
             UnityEngine.Object.DestroyImmediate(previous.gameObject);
 
-        TMP_Text text = CreateText(name, parent, "10/15", 21f, DeepBlue, TextAlignmentOptions.Center);
+        TMP_Text text = CreateText(name, parent, "6/9", 21f, DeepBlue, TextAlignmentOptions.Center);
         text.rectTransform.anchorMin = Vector2.zero;
         text.rectTransform.anchorMax = Vector2.one;
         text.rectTransform.pivot = new Vector2(0.5f, 0.5f);
